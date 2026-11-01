@@ -3,3 +3,9 @@ node_modules/
 dist/
 
 server.log
+
+drizzle.config.ts
+
+src/db
+
+.env
