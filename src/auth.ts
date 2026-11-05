@@ -65,3 +65,12 @@ export function getBearerToken(req: Request): string{
 export function makeRefreshToken(): string {
     return randomBytes(32).toString("hex");
 }
+
+export function getAPIKey(req: Request){
+    const authorization = req.get("Authorization");
+    if(authorization === undefined){
+        throw new Unauthorized("no token provided");
+    }
+    const [pre, key] = authorization.split(" ");
+    return key.trim();
+}

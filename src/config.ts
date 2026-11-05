@@ -18,6 +18,7 @@ type APIConfig = {
   dbURL: string;
   port: number;
   platform: string;
+  polkaKey: string
 };
 if(process.env.DB_URL === undefined){
   throw new Error("no connection string is provided");
@@ -32,9 +33,12 @@ if(process.env.PLATFORM !== "dev"){
 if(process.env.SECRET === undefined){
   throw new Error("no secret is provided");
 }
+if(process.env.POLKA_KEY === undefined){
+  throw new Error("no polka key is provided");
+}
 
 
-const apiConfig: APIConfig = {fileserverHits: 0, dbURL: process.env.DB_URL, port: parseInt(process.env.PORT), platform: process.env.PLATFORM}
+const apiConfig: APIConfig = {fileserverHits: 0, dbURL: process.env.DB_URL, port: parseInt(process.env.PORT), platform: process.env.PLATFORM, polkaKey: process.env.POLKA_KEY}
 const dbConfig: DBConfig = {url: process.env.DB_URL, migrationConfig: migrationConfig}
 
 export const config = {api: apiConfig, db: dbConfig, secret: process.env.SECRET};

@@ -1,5 +1,5 @@
 import express, { type Express, type Request, type Response } from 'express';
-import { handlerChangeInfo, handlerChirpyValidation, handlerCreateChirp, handlerCreateUser, handlerDeleteChirp, handlerError, handlerGetChirp, handlerGetChirps, handlerLogin, handlerNumberOfReq, handlerReadiness, handlerRefresh, handlerReset, handlerRevoke, middlewareLogResponses, middlewareMetricsInc } from './handlers.js';
+import { handlerChangeInfo, handlerChirpyValidation, handlerCreateChirp, handlerCreateUser, handlerDeleteChirp, handlerError, handlerGetChirp, handlerGetChirps, handlerLogin, handlerNumberOfReq, handlerReadiness, handlerRefresh, handlerReset, handlerRevoke, handlerWebhooks, middlewareLogResponses, middlewareMetricsInc } from './handlers.js';
 import { config } from './config.js';
 import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
@@ -23,6 +23,7 @@ app.post("/api/chirps", express.json(), handlerCreateChirp);
 app.post("/api/login", express.json(), handlerLogin);
 app.post("/api/refresh", handlerRefresh);
 app.post("/api/revoke", handlerRevoke);
+app.post("/api/polka/webhooks", express.json(), handlerWebhooks);
 app.put("/api/users",express.json() ,handlerChangeInfo);
 app.delete("/api/chirps/:chirpId", handlerDeleteChirp);
 app.use(middlewareLogResponses);

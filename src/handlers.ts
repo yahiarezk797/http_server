@@ -2,9 +2,9 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import { config } from './config.js';
 import { error } from 'node:console';
 import { create } from 'node:domain';
-import { createUser, getUserByEmail, getUserByID, reset, updateUser } from './db/queries/users.js';
+import { createUser, getUserByEmail, getUserByID, reset, updateUser, userToChirpyRed } from './db/queries/users.js';
 import { createChirp, deleteChirp, getChirp, getChirps } from './db/queries/chirps.js';
-import { checkPasswordHash, getBearerToken, hashPassword, makeJWT, makeRefreshToken, validateJWT } from './auth.js';
+import { checkPasswordHash, getAPIKey, getBearerToken, hashPassword, makeJWT, makeRefreshToken, validateJWT } from './auth.js';
 import { NewUser } from './db/schema.js';
 import { createRefreshToken, getRefreshTokenByToken, revokeRefreshToken } from './db/queries/refresh_Token.js';
 import { ne } from 'drizzle-orm';
@@ -141,12 +141,7 @@ export async function handlerCreateUser(req: Request, res: Response) {
     const nuser: NewUser = {email: req.body.email, hashedPassword: await hashPassword(req.body.password)}
     const user = await createUser(nuser);
     res.status(201);
-    res.json({
-        id: user.id,
-        email: user.email,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-    });
+    res.json(user);
 }
 
 export async function handlerCreateChirp(req: Request, res: Response) {
@@ -172,7 +167,20 @@ export async function handlerCreateChirp(req: Request, res: Response) {
 }
 
 export async function handlerGetChirps(req: Request, res: Response) {
-    const chirps = await getChirps();
+    let authorId = "";
+    let authorIdQuery = req.query.authorId;
+    if (typeof authorIdQuery === "string") {
+        authorId = authorIdQuery;
+    }
+    let sort = "";
+    let sortBy = req.query.sort;
+    if (typeof sortBy === "string") {
+        sort = sortBy;
+    }
+    let chirps = await getChirps(authorId, sort);
+    if(sort === "desc"){
+        chirps.reverse();
+    }
     res.status(200).json(chirps);
 }
 
@@ -207,6 +215,7 @@ export async function handlerLogin(req: Request, res: Response) {
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         email: user.email,
+        isChirpyRed: user.isChirpyRed,
         token: token,
         refreshToken: refreshToken
     });
@@ -254,4 +263,20 @@ export async function handlerDeleteChirp(req: Request, res: Response) {
     await deleteChirp(chirp.id);
     res.status(204)
     res.end();
+}
+
+export async function handlerWebhooks(req: Request, res: Response) {
+    const key = getAPIKey(req);
+    if(key !== config.api.polkaKey){
+        throw new Unauthorized("wrong key");
+    }
+    if(req.body.event !== "user.upgraded"){
+        res.status(204);
+        res.end();
+    }
+    const user = userToChirpyRed(req.body.data.userId);
+    if(user === undefined){
+        throw new NotFoundError("no such a user");
+    }
+    res.status(204).end();
 }
