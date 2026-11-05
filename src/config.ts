@@ -1,6 +1,7 @@
 import type { MigrationConfig } from "drizzle-orm/migrator";
 import { int } from "drizzle-orm/mysql-core";
 import { Forbidden } from "./handlers.js";
+import { env } from "node:process";
 process.loadEnvFile(".env");
 
 type DBConfig = {
@@ -28,8 +29,12 @@ if(process.env.PORT === undefined){
 if(process.env.PLATFORM !== "dev"){
   throw new Forbidden("it is not dev");
 }
+if(process.env.SECRET === undefined){
+  throw new Error("no secret is provided");
+}
+
 
 const apiConfig: APIConfig = {fileserverHits: 0, dbURL: process.env.DB_URL, port: parseInt(process.env.PORT), platform: process.env.PLATFORM}
 const dbConfig: DBConfig = {url: process.env.DB_URL, migrationConfig: migrationConfig}
 
-export const config = {api: apiConfig, db: dbConfig};
+export const config = {api: apiConfig, db: dbConfig, secret: process.env.SECRET};

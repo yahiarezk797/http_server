@@ -2,9 +2,19 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import { config } from './config.js';
 import { error } from 'node:console';
 import { create } from 'node:domain';
-import { createUser, reset } from './db/queries/users.js';
-import { createChirp, getChirps } from './db/queries/chirps.js';
+import { createUser, getUserByEmail, getUserByID, reset, updateUser } from './db/queries/users.js';
+import { createChirp, deleteChirp, getChirp, getChirps } from './db/queries/chirps.js';
+import { checkPasswordHash, getBearerToken, hashPassword, makeJWT, makeRefreshToken, validateJWT } from './auth.js';
+import { NewUser } from './db/schema.js';
+import { createRefreshToken, getRefreshTokenByToken, revokeRefreshToken } from './db/queries/refresh_Token.js';
+import { ne } from 'drizzle-orm';
+import { json } from 'node:stream/consumers';
 
+
+type loginJson = {
+    password: string,
+    email: string,
+}
 
 type ChirpyJSON = {
     body: string;
@@ -128,7 +138,8 @@ export async function handlerChirpyValidation(req: Request, res: Response): Prom
 }
 
 export async function handlerCreateUser(req: Request, res: Response) {
-    const user = await createUser(req.body);
+    const nuser: NewUser = {email: req.body.email, hashedPassword: await hashPassword(req.body.password)}
+    const user = await createUser(nuser);
     res.status(201);
     res.json({
         id: user.id,
@@ -139,7 +150,17 @@ export async function handlerCreateUser(req: Request, res: Response) {
 }
 
 export async function handlerCreateChirp(req: Request, res: Response) {
-    const chirp = await createChirp(req.body);
+    const token = getBearerToken(req);
+    const userID = validateJWT(token, config.secret);
+    const user = await getUserByID(userID);
+    if(user === undefined){
+        throw new Unauthorized("No such a user");
+    }
+    const chirp_to_be = {
+        body: req.body.body,
+        userId: user.id
+    }
+    const chirp = await createChirp(chirp_to_be);
     res.status(201);
     res.json({
         id: chirp.id,
@@ -153,4 +174,84 @@ export async function handlerCreateChirp(req: Request, res: Response) {
 export async function handlerGetChirps(req: Request, res: Response) {
     const chirps = await getChirps();
     res.status(200).json(chirps);
+}
+
+export async function handlerGetChirp(req: Request, res: Response) {
+    if(typeof req.params.chirpId !== "string" ){
+        throw new NotFoundError("no such a ChirpId");
+    }
+    const chirp = await getChirp(req.params.chirpId);
+    if(chirp === undefined){
+        throw new NotFoundError("there is no chirp with this id");
+    }
+    res.json(chirp);
+}
+
+export async function handlerLogin(req: Request, res: Response) {
+    const jsn : loginJson = req.body;
+    const user = await getUserByEmail(jsn.email);
+    if(user === undefined){
+        throw new Unauthorized("incorrect email or password");
+    }
+    const correct_password = await checkPasswordHash(req.body.password, user.hashedPassword);
+    if(!correct_password){
+        throw new Unauthorized("incorrect email or password");
+    }
+    const token = makeJWT(user.id, 3600, config.secret);
+    const refreshToken = makeRefreshToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 60);
+    const create = createRefreshToken({token: refreshToken, userId: user.id, expiresAt: expiresAt});
+    res.json({
+        id: user.id,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        email: user.email,
+        token: token,
+        refreshToken: refreshToken
+    });
+}
+
+export async function handlerRefresh(req: Request, res: Response) {
+    const refreshToken = getBearerToken(req);
+    const fullToken = await getRefreshTokenByToken(refreshToken);
+    if(fullToken === undefined || fullToken.revokedAt !== null || Date.now() > fullToken.expiresAt.getTime()){
+        throw new Unauthorized("wrong, expired or revoked refresh Token");
+    }
+    const token = makeJWT(fullToken.userId, 3600, config.secret);
+    res.json({
+        token: token
+    });
+}
+
+export async function handlerRevoke(req: Request, res: Response) {
+    const refreshToken = getBearerToken(req);
+    await revokeRefreshToken(refreshToken);
+    res.status(204).end();
+}
+
+export async function handlerChangeInfo(req: Request, res: Response) {
+    const token = getBearerToken(req);
+    const userId = validateJWT(token, config.secret);
+    const updates = {email: req.body.email, password: hashPassword(req.body.password)};
+    const user = await updateUser(userId, updates);
+    res.json(user);
+}
+
+export async function handlerDeleteChirp(req: Request, res: Response) {
+    const token = getBearerToken(req);
+    const userId = validateJWT(token, config.secret);
+    if(typeof req.params.chirpId !== "string" ){
+        throw new NotFoundError("no such a ChirpId");
+    }
+    const chirp = await getChirp(req.params.chirpId);
+    if(chirp === undefined){
+        throw new NotFoundError("no such a Chirp with this id");
+    }
+    if(chirp.userId !== userId){
+        throw new Forbidden("you don't own this chirp");
+    }
+    await deleteChirp(chirp.id);
+    res.status(204)
+    res.end();
 }

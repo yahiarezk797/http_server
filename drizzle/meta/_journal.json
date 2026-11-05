@@ -15,6 +15,27 @@
       "when": 1793524788849,
       "tag": "0001_typical_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793637961141,
+      "tag": "0002_rapid_karnak",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793805912421,
+      "tag": "0003_freezing_puppet_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793810866290,
+      "tag": "0004_funny_madame_hydra",
+      "breakpoints": true
     }
   ]
 }
